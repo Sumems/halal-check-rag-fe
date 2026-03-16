@@ -1,15 +1,586 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+@source "../node_modules/streamdown/dist";
+
+@custom-variant dark (&:is(.dark *));
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
-html,
-body {
-  @apply bg-white dark:bg-gray-950;
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
 
-  @media (prefers-color-scheme: dark) {
-    color-scheme: dark;
+/* =========================================================
+   Light Mode - Green Theme (Halal Check)
+   ========================================================= */
+:root {
+  --radius: 0.625rem;
+
+  /* Background & Foreground */
+  --background: oklch(1 0 0);                     /* white */
+  --foreground: oklch(0.266 0.065 152.934);        /* green-950 */
+
+  /* Card */
+  --card: oklch(1 0 0);                            /* white */
+  --card-foreground: oklch(0.266 0.065 152.934);   /* green-950 */
+
+  /* Popover */
+  --popover: oklch(1 0 0);                         /* white */
+  --popover-foreground: oklch(0.266 0.065 152.934);/* green-950 */
+
+  /* Primary: green-600 */
+  --primary: oklch(0.627 0.194 149.214);
+  --primary-foreground: oklch(0.985 0 0);
+
+  /* Secondary: green-100 */
+  --secondary: oklch(0.962 0.044 156.743);
+  --secondary-foreground: oklch(0.448 0.119 151.328); /* green-800 */
+
+  /* Muted: green-50 */
+  --muted: oklch(0.982 0.018 155.826);
+  --muted-foreground: oklch(0.527 0.154 150.069);  /* green-700 */
+
+  /* Accent: green-50 */
+  --accent: oklch(0.982 0.018 155.826);
+  --accent-foreground: oklch(0.393 0.095 152.535); /* green-900 */
+
+  /* Destructive */
+  --destructive: oklch(0.577 0.245 27.325);
+
+  /* Border & Input: green-200 */
+  --border: oklch(0.925 0.084 155.995);
+  --input: oklch(0.925 0.084 155.995);
+
+  /* Ring: green-400 */
+  --ring: oklch(0.792 0.209 151.711);
+
+  /* Charts */
+  --chart-1: oklch(0.627 0.194 149.214);  /* green-600 */
+  --chart-2: oklch(0.723 0.219 149.579);  /* green-500 */
+  --chart-3: oklch(0.448 0.119 151.328);  /* green-800 */
+  --chart-4: oklch(0.871 0.15 154.449);   /* green-300 */
+  --chart-5: oklch(0.792 0.209 151.711);  /* green-400 */
+
+  /* Sidebar */
+  --sidebar: oklch(0.982 0.018 155.826);              /* green-50 */
+  --sidebar-foreground: oklch(0.266 0.065 152.934);    /* green-950 */
+  --sidebar-primary: oklch(0.627 0.194 149.214);       /* green-600 */
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.962 0.044 156.743);        /* green-100 */
+  --sidebar-accent-foreground: oklch(0.393 0.095 152.535); /* green-900 */
+  --sidebar-border: oklch(0.925 0.084 155.995);         /* green-200 */
+  --sidebar-ring: oklch(0.792 0.209 151.711);           /* green-400 */
+}
+
+/* =========================================================
+   Dark Mode - Green Theme (Halal Check)
+   ========================================================= */
+.dark {
+  /* Background & Foreground */
+  --background: oklch(0.205 0.052 152.934);        /* ~green-950 darker */
+  --foreground: oklch(0.962 0.044 156.743);         /* green-100 */
+
+  /* Card: green-900 */
+  --card: oklch(0.335 0.08 152.535);
+  --card-foreground: oklch(0.962 0.044 156.743);    /* green-100 */
+
+  /* Popover: green-900 */
+  --popover: oklch(0.335 0.08 152.535);
+  --popover-foreground: oklch(0.962 0.044 156.743); /* green-100 */
+
+  /* Primary: green-500 */
+  --primary: oklch(0.723 0.219 149.579);
+  --primary-foreground: oklch(0.205 0.052 152.934);
+
+  /* Secondary: green-900 */
+  --secondary: oklch(0.335 0.08 152.535);
+  --secondary-foreground: oklch(0.962 0.044 156.743); /* green-100 */
+
+  /* Muted: green-900 */
+  --muted: oklch(0.335 0.08 152.535);
+  --muted-foreground: oklch(0.792 0.209 151.711);  /* green-400 */
+
+  /* Accent: green-800 */
+  --accent: oklch(0.393 0.095 152.535);
+  --accent-foreground: oklch(0.962 0.044 156.743);  /* green-100 */
+
+  /* Destructive */
+  --destructive: oklch(0.704 0.191 22.216);
+
+  /* Border & Input: green-800 */
+  --border: oklch(0.393 0.095 152.535);
+  --input: oklch(0.393 0.095 152.535);
+
+  /* Ring: green-600 */
+  --ring: oklch(0.627 0.194 149.214);
+
+  /* Charts */
+  --chart-1: oklch(0.723 0.219 149.579);  /* green-500 */
+  --chart-2: oklch(0.792 0.209 151.711);  /* green-400 */
+  --chart-3: oklch(0.871 0.15 154.449);   /* green-300 */
+  --chart-4: oklch(0.627 0.194 149.214);  /* green-600 */
+  --chart-5: oklch(0.527 0.154 150.069);  /* green-700 */
+
+  /* Sidebar */
+  --sidebar: oklch(0.266 0.065 152.934);               /* green-950 */
+  --sidebar-foreground: oklch(0.962 0.044 156.743);     /* green-100 */
+  --sidebar-primary: oklch(0.723 0.219 149.579);        /* green-500 */
+  --sidebar-primary-foreground: oklch(0.205 0.052 152.934);
+  --sidebar-accent: oklch(0.393 0.095 152.535);          /* green-900 */
+  --sidebar-accent-foreground: oklch(0.962 0.044 156.743); /* green-100 */
+  --sidebar-border: oklch(0.393 0.095 152.535);           /* green-900 */
+  --sidebar-ring: oklch(0.627 0.194 149.214);             /* green-600 */
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* =========================================================
+   Streamdown Markdown Output - Structured Chat Styling
+   ========================================================= */
+
+[data-streamdown="heading-1"] {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid oklch(0.925 0.084 155.995);
+  color: oklch(0.266 0.065 152.934);
+}
+
+[data-streamdown="heading-2"] {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.375rem;
+  border-bottom: 1px solid oklch(0.925 0.084 155.995);
+  color: oklch(0.266 0.065 152.934);
+}
+
+[data-streamdown="heading-3"] {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  color: oklch(0.393 0.095 152.535);
+}
+
+[data-streamdown="heading-4"],
+[data-streamdown="heading-5"],
+[data-streamdown="heading-6"] {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-top: 0.75rem;
+  margin-bottom: 0.375rem;
+  color: oklch(0.448 0.119 151.328);
+}
+
+.dark [data-streamdown="heading-1"] {
+  color: oklch(0.962 0.044 156.743);
+  border-bottom-color: oklch(0.393 0.095 152.535);
+}
+
+.dark [data-streamdown="heading-2"] {
+  color: oklch(0.962 0.044 156.743);
+  border-bottom-color: oklch(0.393 0.095 152.535);
+}
+
+.dark [data-streamdown="heading-3"] {
+  color: oklch(0.871 0.15 154.449);
+}
+
+.dark [data-streamdown="heading-4"],
+.dark [data-streamdown="heading-5"],
+.dark [data-streamdown="heading-6"] {
+  color: oklch(0.792 0.209 151.711);
+}
+
+[data-streamdown="ordered-list"],
+[data-streamdown="unordered-list"] {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-left: 1.5rem;
+}
+
+[data-streamdown="ordered-list"] {
+  list-style-type: decimal;
+}
+
+[data-streamdown="unordered-list"] {
+  list-style-type: disc;
+}
+
+[data-streamdown="ordered-list"] [data-streamdown="ordered-list"],
+[data-streamdown="unordered-list"] [data-streamdown="unordered-list"],
+[data-streamdown="ordered-list"] [data-streamdown="unordered-list"],
+[data-streamdown="unordered-list"] [data-streamdown="ordered-list"] {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+[data-streamdown="list-item"] {
+  margin-bottom: 0.25rem;
+  line-height: 1.6;
+  padding-left: 0.25rem;
+}
+
+[data-streamdown="list-item"]::marker {
+  color: oklch(0.627 0.194 149.214);
+}
+
+.dark [data-streamdown="list-item"]::marker {
+  color: oklch(0.723 0.219 149.579);
+}
+
+[data-streamdown="strong"] {
+  font-weight: 700;
+  color: oklch(0.266 0.065 152.934);
+}
+
+.dark [data-streamdown="strong"] {
+  color: oklch(0.962 0.044 156.743);
+}
+
+[data-streamdown="link"] {
+  color: oklch(0.627 0.194 149.214);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s ease;
+}
+
+[data-streamdown="link"]:hover {
+  color: oklch(0.527 0.154 150.069);
+}
+
+.dark [data-streamdown="link"] {
+  color: oklch(0.792 0.209 151.711);
+}
+
+.dark [data-streamdown="link"]:hover {
+  color: oklch(0.871 0.15 154.449);
+}
+
+[data-streamdown="inline-code"] {
+  background-color: oklch(0.962 0.044 156.743);
+  color: oklch(0.393 0.095 152.535);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  border: 1px solid oklch(0.925 0.084 155.995);
+}
+
+.dark [data-streamdown="inline-code"] {
+  background-color: oklch(0.335 0.08 152.535);
+  color: oklch(0.871 0.15 154.449);
+  border-color: oklch(0.393 0.095 152.535);
+}
+
+[data-streamdown="code-block"] {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid oklch(0.925 0.084 155.995);
+  overflow: hidden;
+}
+
+.dark [data-streamdown="code-block"] {
+  border-color: oklch(0.393 0.095 152.535);
+}
+
+[data-streamdown="blockquote"] {
+  border-left: 3px solid oklch(0.627 0.194 149.214);
+  background-color: oklch(0.982 0.018 155.826);
+  padding: 0.75rem 1rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-radius: 0 0.375rem 0.375rem 0;
+  color: oklch(0.448 0.119 151.328);
+  font-style: italic;
+}
+
+.dark [data-streamdown="blockquote"] {
+  border-left-color: oklch(0.723 0.219 149.579);
+  background-color: oklch(0.335 0.08 152.535);
+  color: oklch(0.871 0.15 154.449);
+}
+
+[data-streamdown="table-wrapper"] {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  border: 1px solid oklch(0.925 0.084 155.995);
+}
+
+.dark [data-streamdown="table-wrapper"] {
+  border-color: oklch(0.393 0.095 152.535);
+}
+
+[data-streamdown="table"] {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+[data-streamdown="table-header"] {
+  background-color: oklch(0.962 0.044 156.743);
+}
+
+.dark [data-streamdown="table-header"] {
+  background-color: oklch(0.335 0.08 152.535);
+}
+
+[data-streamdown="table-header-cell"] {
+  padding: 0.625rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: oklch(0.266 0.065 152.934);
+  border-bottom: 2px solid oklch(0.925 0.084 155.995);
+  white-space: nowrap;
+}
+
+.dark [data-streamdown="table-header-cell"] {
+  color: oklch(0.962 0.044 156.743);
+  border-bottom-color: oklch(0.393 0.095 152.535);
+}
+
+[data-streamdown="table-cell"] {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid oklch(0.925 0.084 155.995);
+  line-height: 1.5;
+}
+
+.dark [data-streamdown="table-cell"] {
+  border-bottom-color: oklch(0.393 0.095 152.535);
+}
+
+[data-streamdown="table-row"]:last-child [data-streamdown="table-cell"] {
+  border-bottom: none;
+}
+
+[data-streamdown="table-body"] [data-streamdown="table-row"]:nth-child(even) {
+  background-color: oklch(0.982 0.018 155.826 / 0.5);
+}
+
+.dark [data-streamdown="table-body"] [data-streamdown="table-row"]:nth-child(even) {
+  background-color: oklch(0.335 0.08 152.535 / 0.3);
+}
+
+[data-streamdown="horizontal-rule"] {
+  margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
+  border: none;
+  border-top: 1px solid oklch(0.925 0.084 155.995);
+}
+
+.dark [data-streamdown="horizontal-rule"] {
+  border-top-color: oklch(0.393 0.095 152.535);
+}
+
+.prose-chat p {
+  margin-bottom: 0.75rem;
+  line-height: 1.7;
+}
+
+.prose-chat p:last-child {
+  margin-bottom: 0;
+}
+
+.prose-chat > *:first-child {
+  margin-top: 0;
+}
+
+.prose-chat > *:last-child {
+  margin-bottom: 0;
+}
+
+/* =========================================================
+   n8n Chat Widget - Green Theme Overrides
+   ========================================================= */
+#n8n-chat {
+  width: 100%;
+  height: 100%;
+
+  --chat--color--primary: #16a34a;
+  --chat--color--primary-shade-50: #15803d;
+  --chat--color--primary--shade-100: #166534;
+  --chat--color--secondary: #22c55e;
+  --chat--color-secondary-shade-50: #16a34a;
+  --chat--color-white: #ffffff;
+  --chat--color-light: #f0fdf4;
+  --chat--color-light-shade-50: #dcfce7;
+  --chat--color-light-shade-100: #86efac;
+  --chat--color-medium: #bbf7d0;
+  --chat--color-dark: #052e16;
+  --chat--color-disabled: #86efac;
+  --chat--color-typing: #14532d;
+
+  --chat--border-radius: 0.75rem;
+  --chat--font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --chat--header--background: #052e16;
+  --chat--header--color: #dcfce7;
+  --chat--heading--font-size: 1.25em;
+
+  --chat--message--bot--background: #ffffff;
+  --chat--message--bot--color: #052e16;
+  --chat--message--bot--border: 1px solid #dcfce7;
+  --chat--message--user--background: #16a34a;
+  --chat--message--user--color: #ffffff;
+  --chat--message--user--border: none;
+  --chat--message--pre--background: rgba(22, 163, 74, 0.08);
+  --chat--message--border-radius: 0.75rem;
+
+  --chat--body--background: #f0fdf4;
+  --chat--footer--background: #f0fdf4;
+  --chat--footer--color: #052e16;
+
+  --chat--input--background: #ffffff;
+  --chat--input--text-color: #052e16;
+  --chat--input--border: 1px solid #bbf7d0;
+  --chat--input--border-active: 1px solid #16a34a;
+
+  --chat--button--background--primary: #16a34a;
+  --chat--button--color--primary: #ffffff;
+  --chat--button--background--primary--hover: #15803d;
+  --chat--button--color--primary--hover: #ffffff;
+  --chat--button--background--primary--disabled: #86efac;
+  --chat--button--color--primary--disabled: #ffffff;
+
+  --chat--input--send--button--background: transparent;
+  --chat--input--send--button--color: #16a34a;
+  --chat--input--send--button--background-hover: #dcfce7;
+  --chat--input--send--button--color-hover: #15803d;
+
+  --chat--input--file--button--background: transparent;
+  --chat--input--file--button--color: #16a34a;
+  --chat--input--file--button--background-hover: #dcfce7;
+  --chat--input--file--button--color-hover: #15803d;
+
+  --chat--toggle--background: #16a34a;
+  --chat--toggle--hover--background: #15803d;
+  --chat--toggle--active--background: #166534;
+  --chat--toggle--color: #ffffff;
+
+  --chat--window--border: 1px solid #dcfce7;
+}
+
+#n8n-chat .chat-header {
+  display: none;
+}
+
+/* =========================================================
+   n8n Chat Widget - Dark Mode Overrides
+   ========================================================= */
+.dark #n8n-chat {
+  --chat--color--primary: #22c55e;
+  --chat--color--primary-shade-50: #16a34a;
+  --chat--color--primary--shade-100: #15803d;
+  --chat--color--secondary: #4ade80;
+  --chat--color-secondary-shade-50: #22c55e;
+  --chat--color-white: #0c1f12;
+  --chat--color-light: #14532d;
+  --chat--color-light-shade-50: #0c1f12;
+  --chat--color-light-shade-100: #166534;
+  --chat--color-medium: #15803d;
+  --chat--color-dark: #dcfce7;
+  --chat--color-disabled: #166534;
+  --chat--color-typing: #86efac;
+
+  --chat--header--background: #052e16;
+  --chat--header--color: #dcfce7;
+
+  --chat--message--bot--background: #14532d;
+  --chat--message--bot--color: #dcfce7;
+  --chat--message--bot--border: 1px solid #166534;
+  --chat--message--user--background: #22c55e;
+  --chat--message--user--color: #052e16;
+  --chat--message--pre--background: rgba(255, 255, 255, 0.08);
+
+  --chat--body--background: #0c1f12;
+  --chat--footer--background: #0c1f12;
+  --chat--footer--color: #dcfce7;
+
+  --chat--input--background: #14532d;
+  --chat--input--text-color: #dcfce7;
+  --chat--input--border: 1px solid #166534;
+  --chat--input--border-active: 1px solid #22c55e;
+
+  --chat--button--background--primary: #22c55e;
+  --chat--button--color--primary: #052e16;
+  --chat--button--background--primary--hover: #4ade80;
+  --chat--button--color--primary--hover: #052e16;
+  --chat--button--background--primary--disabled: #166534;
+  --chat--button--color--primary--disabled: #86efac;
+
+  --chat--input--send--button--background: transparent;
+  --chat--input--send--button--color: #22c55e;
+  --chat--input--send--button--background-hover: #14532d;
+  --chat--input--send--button--color-hover: #4ade80;
+
+  --chat--input--file--button--background: transparent;
+  --chat--input--file--button--color: #22c55e;
+  --chat--input--file--button--background-hover: #14532d;
+  --chat--input--file--button--color-hover: #4ade80;
+
+  --chat--toggle--background: #22c55e;
+  --chat--toggle--hover--background: #4ade80;
+  --chat--toggle--active--background: #16a34a;
+  --chat--toggle--color: #052e16;
+
+  --chat--window--border: 1px solid #166534;
 }

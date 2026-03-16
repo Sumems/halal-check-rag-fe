@@ -1,0 +1,373 @@
+# RULES PROMPTING - Halal Check RAG Frontend
+## Framework: React Router v7 + ReactBits + Shadcn
+
+---
+
+## 🌐 BAHASA & LOKALISASI
+- Gunakan Bahasa Indonesia untuk semua teks UI, komentar, dan dokumentasi
+- Pesan error dan validasi dalam Bahasa Indonesia
+- Gunakan format tanggal Indonesia (DD/MM/YYYY)
+- Gunakan format mata uang Indonesia jika diperlukan (Rp)
+
+---
+
+## 🎨 DESIGN SYSTEM & WARNA
+
+### Tema & Mode
+- Aplikasi mendukung **Light Mode** dan **Dark Mode**
+- Tema dikelola oleh `ThemeProvider` di `~/lib/theme.tsx`
+- Toggle tema via `useTheme()` hook → `{ theme, toggleTheme }`
+- Class `.dark` diterapkan pada `<html>` element
+- Tailwind dark variant: `dark:` (dikonfigurasi via `@custom-variant dark (&:is(.dark *))`)
+- CSS variables di `app.css` otomatis berubah berdasarkan mode
+- Inline script di `<head>` mencegah flash of incorrect theme saat load
+
+### Palet Warna Utama
+- **Primary**: Skema warna hijau (green-50 hingga green-950)
+- **Accent**: green-600 (light) / green-500 (dark) sebagai warna utama interaktif
+
+### Light Mode
+```
+- Background:        white (#FFFFFF)
+- Background Alt:    green-50
+- Text Utama:        green-950
+- Text Sekunder:     green-700
+- Border Halus:      green-200
+- Border Tegas:      green-300
+- Primary:           green-600
+- Secondary:         green-100 / green-800 (foreground)
+- Muted:             green-50 / green-700 (foreground)
+- Accent:            green-50 / green-900 (foreground)
+- Ring/Focus:        green-400
+```
+
+### Dark Mode
+```
+- Background:        ~green-950 (lebih gelap)
+- Background Alt:    green-900
+- Text Utama:        green-100
+- Text Sekunder:     green-400
+- Border Halus:      green-800
+- Border Tegas:      green-700
+- Primary:           green-500
+- Secondary:         green-900 / green-100 (foreground)
+- Muted:             green-900 / green-400 (foreground)
+- Accent:            green-800 / green-100 (foreground)
+- Ring/Focus:        green-600
+```
+
+### Penggunaan Warna (Light / Dark)
+```
+Tombol Primary:
+  light: bg-green-600 hover:bg-green-700 text-white
+  dark:  dark:bg-green-500 dark:hover:bg-green-400 dark:text-green-950
+
+Tombol Secondary:
+  light: bg-green-100 hover:bg-green-200 text-green-800
+  dark:  dark:bg-green-900 dark:hover:bg-green-800 dark:text-green-100
+
+Tombol Outline:
+  light: border-green-600 text-green-600 hover:bg-green-50
+  dark:  dark:border-green-500 dark:text-green-400 dark:hover:bg-green-900
+
+Card:
+  light: bg-white border-green-200 shadow-sm
+  dark:  dark:bg-green-900 dark:border-green-700
+
+Header/Navbar:
+  light: bg-white border-green-200
+  dark:  dark:bg-green-950 dark:border-green-800
+
+Footer: bg-green-950 text-green-100 (sama di kedua mode)
+
+Input:
+  light: border-green-200
+  dark:  dark:border-green-700 dark:bg-green-900
+
+Status States (sama di kedua mode):
+  - Success: green-500
+  - Warning: amber-500
+  - Error: red-500
+  - Info: blue-500
+```
+
+### Aturan Penulisan Dark Mode
+1. Selalu sertakan varian `dark:` saat menulis class warna Tailwind
+2. Gunakan CSS variables (`bg-background`, `text-foreground`, dll) untuk elemen yang mengikuti tema otomatis
+3. Gunakan class Tailwind eksplisit (`text-green-950 dark:text-green-100`) untuk kontrol granular
+4. Pastikan contrast ratio tetap memenuhi WCAG 2.1 di kedua mode
+5. Test tampilan di kedua mode sebelum commit
+
+---
+
+## 📦 KOMPONEN & LIBRARY
+
+### Icon Library
+- **Gunakan**: `react-icons` (sudah dikonfigurasi di components.json)
+- **Import pattern**: `import { IconName } from "react-icons/fa6";`
+- **Preferensi set**: FaIcons (FontAwesome), HiIcons (Heroicons), LuIcons (Lucide - tersedia via lucide-react)
+
+### UI Components - Shadcn
+- Lokasi: `~/components/ui/`
+- **Komponen tersedia**: accordion, alert, avatar, badge, button, button-group, card, carousel, collapsible, command, dialog, dropdown-menu, hover-card, input, input-group, popover, progress, scroll-area, select, separator, switch, tabs, textarea, tooltip
+- **Style**: new-york
+- **Import pattern**: `import { Button } from "~/components/ui/button"`
+
+### Animation Components - ReactBits
+- **Registry**: `https://reactbits.dev/r/{name}.json`
+- **Komponen tersedia di project**: CardNav, CardSwap, Carousel, ClickSpark, Dock, GridMotion, SpotlightCard, StarBorder, Stepper
+- **Import pattern**: `import { ComponentName } from "~/components/ComponentName"`
+- **Instal komponen baru**: `npx shadcn@latest add "@react-bits/{component-name}"`
+
+### AI Elements
+- **Registry**: `https://ai-sdk.dev/elements/api/registry/{name}.json`
+- **Lokasi**: `~/components/ai-elements/`
+
+### Animation Library
+- **GSAP**: Untuk animasi kompleks dan timeline
+- **Motion (Framer Motion)**: Untuk animasi deklaratif React
+- **Gunakan**: motion untuk animasi sederhana, GSAP untuk animasi kompleks
+
+---
+
+## 🛠️ TEKNOLOGI STACK
+
+### Framework & Build
+- **React Router v7** (Framework mode, bukan library mode)
+- **Vite 7** sebagai build tool
+- **TypeScript** (strict mode)
+- **TailwindCSS v4** untuk styling
+
+### Routing & Navigation
+- File routing di `app/routes/`
+- Konfigurasi route di `app/routes.ts`
+- Gunakan `Link` dan `NavLink` dari `react-router`
+- Loader dan Action untuk data fetching
+
+### State Management
+- Gunakan React Router loader/action untuk server state
+- Gunakan React hooks (useState, useReducer) untuk client state
+- Gunakan Context API untuk state global sederhana
+
+---
+
+## 📁 STRUKTUR FILE & FOLDER
+
+```
+app/
+├── components/
+│   ├── ui/              # Komponen Shadcn
+│   ├── ai-elements/     # AI SDK Elements
+│   └── [ComponentName].tsx  # Komponen ReactBits & Custom
+├── lib/
+│   ├── utils.ts         # Utility functions (cn helper)
+│   └── theme.tsx        # ThemeProvider & useTheme hook (light/dark mode)
+├── routes/              # File-based routing
+├── app.css              # Global styles, Tailwind & CSS variables (light/dark)
+├── root.tsx             # Root layout (ThemeProvider wrapper + inline theme script)
+└── routes.ts            # Route configuration
+```
+
+### Konvensi Penamaan
+- **Komponen**: PascalCase (contoh: `UserProfile.tsx`)
+- **Utility/hooks**: camelCase (contoh: `useAuth.ts`)
+- **Routes**: kebab-case (contoh: `user-profile.tsx`)
+- **CSS classes**: kebab-case dengan prefix jika perlu
+
+---
+
+## 🎯 BEST PRACTICES
+
+### Komponen
+1. Selalu gunakan TypeScript dengan proper typing
+2. Export komponen sebagai named export
+3. Gunakan `cn()` helper dari `~/lib/utils` untuk conditional classes
+4. Pisahkan logic dan presentasi jika komponen kompleks
+5. Gunakan composition pattern untuk komponen reusable
+
+### Styling
+1. Prioritaskan Tailwind utility classes
+2. Gunakan CSS variables untuk theming (sudah dikonfigurasi di `app.css`)
+3. Selalu sertakan varian `dark:` untuk setiap class warna Tailwind
+4. Gunakan `useTheme()` dari `~/lib/theme` untuk akses state tema aktif
+5. Responsive design: mobile-first approach
+6. Gunakan `tw-animate-css` untuk animasi utility
+
+### Performance
+1. Lazy load komponen besar dengan React.lazy()
+2. Optimasi gambar dengan format modern (WebP, AVIF)
+3. Gunakan React Router prefetching untuk navigasi cepat
+4. Minimize bundle size dengan tree-shaking
+
+### Aksesibilitas
+1. Gunakan semantic HTML elements
+2. Tambahkan aria-labels pada elemen interaktif
+3. Pastikan contrast ratio memenuhi WCAG 2.1
+4. Support keyboard navigation
+
+---
+
+## 📝 TEMPLATE RESPONSE
+
+### Saat Membuat Komponen Baru
+```tsx
+import { cn } from "~/lib/utils";
+
+interface NamaKomponenProps {
+  // definisi props
+  className?: string;
+}
+
+export function NamaKomponen({ className, ...props }: NamaKomponenProps) {
+  return (
+    <div className={cn("base-classes", className)}>
+      {/* konten */}
+    </div>
+  );
+}
+```
+
+### Saat Membuat Route Baru
+```tsx
+import type { Route } from "./+types/nama-route";
+
+export async function loader({ request }: Route.LoaderArgs) {
+  // load data
+  return { data };
+}
+
+export async function action({ request }: Route.ActionArgs) {
+  // handle form submission
+  return { success: true };
+}
+
+export default function NamaRoute({ loaderData }: Route.ComponentProps) {
+  return (
+    <div>
+      {/* konten halaman */}
+    </div>
+  );
+}
+```
+
+---
+
+## ⚠️ LARANGAN (DON'T)
+
+1. ❌ Jangan gunakan inline styles, selalu gunakan Tailwind
+2. ❌ Jangan buat komponen UI dari nol jika sudah ada di Shadcn
+3. ❌ Jangan gunakan `any` type di TypeScript
+4. ❌ Jangan hardcode warna, gunakan skema green dari Tailwind
+5. ❌ Jangan forget loading dan error states
+6. ❌ Jangan gunakan class components, selalu functional components
+7. ❌ Jangan import seluruh icon library, import specific icons saja
+8. ❌ Jangan abaikan responsive design
+
+---
+
+## ✅ HARUS DILAKUKAN (DO)
+
+1. ✅ Selalu tambahkan loading skeleton saat fetch data
+2. ✅ Gunakan error boundary untuk handle errors
+3. ✅ Tambahkan hover dan focus states pada elemen interaktif
+4. ✅ Gunakan animasi subtle untuk meningkatkan UX
+5. ✅ Test di berbagai ukuran layar (mobile, tablet, desktop)
+6. ✅ Gunakan semantic HTML (header, main, section, article, footer)
+7. ✅ Tambahkan meta tags untuk SEO
+8. ✅ Dokumentasikan props komponen dengan JSDoc atau TypeScript
+
+---
+
+## 🔧 COMMAND REFERENCES
+
+### Development
+```bash
+pnpm dev          # Jalankan development server
+pnpm build        # Build untuk production
+pnpm typecheck    # Check TypeScript errors
+pnpm start        # Jalankan production server
+```
+
+### Tambah Komponen
+```bash
+# Shadcn component
+npx shadcn@latest add [component-name]
+
+# ReactBits component
+npx shadcn@latest add "@react-bits/[component-name]"
+
+# AI Elements
+npx shadcn@latest add "@ai-elements/[component-name]"
+```
+
+---
+
+## 🎨 CONTOH KOMBINASI KOMPONEN
+
+### Card dengan Animasi (Light + Dark)
+```tsx
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { SpotlightCard } from "~/components/SpotlightCard";
+
+<SpotlightCard>
+  <Card className="border-green-200 dark:border-green-700 dark:bg-green-900">
+    <CardHeader>
+      <CardTitle className="text-green-800 dark:text-green-100">Judul</CardTitle>
+    </CardHeader>
+    <CardContent>
+      <p className="text-green-700 dark:text-green-300">{/* konten */}</p>
+    </CardContent>
+  </Card>
+</SpotlightCard>
+```
+
+### Button dengan Icon (Light + Dark)
+```tsx
+import { Button } from "~/components/ui/button";
+import { FaSearch } from "react-icons/fa";
+
+<Button className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-400 dark:text-green-950">
+  <FaSearch className="mr-2 h-4 w-4" />
+  Cari Produk
+</Button>
+```
+
+### Toggle Theme
+```tsx
+import { useTheme } from "~/lib/theme";
+import { Button } from "~/components/ui/button";
+import { MoonIcon, SunIcon } from "lucide-react";
+
+function ThemeToggle() {
+  const { theme, toggleTheme } = useTheme();
+  return (
+    <Button variant="ghost" size="icon" onClick={toggleTheme}>
+      {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+    </Button>
+  );
+}
+```
+
+---
+
+## 📱 BREAKPOINTS (Tailwind v4)
+
+- `sm`: 640px (Mobile landscape)
+- `md`: 768px (Tablet)
+- `lg`: 1024px (Laptop)
+- `xl`: 1280px (Desktop)
+- `2xl`: 1536px (Large desktop)
+
+Gunakan mobile-first: `class="w-full md:w-1/2 lg:w-1/3"`
+
+---
+
+## 🔐 ENVIRONMENT VARIABLES
+
+Lokasi: `.env` dan `.env.example`
+- Prefix `VITE_` untuk variabel yang diakses di client
+- Akses via `import.meta.env.VITE_VARIABLE_NAME`
+
+---
+
+Terakhir diperbarui: 6 Februari 2026 (v2 - ditambahkan panduan light/dark mode)
