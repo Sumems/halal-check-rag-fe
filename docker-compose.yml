@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  halal-check-rag-fe:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VITE_N8N_WEBHOOK_URL=${VITE_N8N_WEBHOOK_URL}
+        - VITE_N8N_AUTH=${VITE_N8N_AUTH}
+    container_name: halal-check-rag-fe
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    env_file:
+      - .env
