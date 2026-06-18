@@ -106,7 +106,10 @@ const SUGGESTION_ITEMS: SuggestionItem[] = [
 ];
 
 function generateSessionId(): string {
-  return crypto.randomUUID().replaceAll("-", "");
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID().replaceAll("-", "");
+  }
+  return nanoid();
 }
 
 const MAX_IMAGE_DIMENSION = 1024;
