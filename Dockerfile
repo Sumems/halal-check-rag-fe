@@ -1,5 +1,5 @@
 FROM node:20-alpine AS base
-RUN corepack enable
+RUN npm install -g pnpm@9
 
 FROM base AS development-dependencies-env
 COPY . /app
