@@ -463,7 +463,7 @@ export default function Chat() {
         <div className="mx-auto w-full max-w-3xl">
           <PromptInput
             accept="image/*"
-            maxFiles={3}
+            maxFiles={1}
             onSubmit={handleSubmit}
             className="rounded-xl border-green-200 shadow-md transition-shadow focus-within:border-green-400 focus-within:shadow-lg dark:border-green-700 dark:bg-green-900 dark:focus-within:border-green-600"
           >
@@ -532,7 +532,7 @@ function ChatBubble({ message }: { message: ChatMessage }) {
   );
 }
 
-const MAX_IMAGES = 3;
+const MAX_IMAGES = 1;
 
 function ImageUploadButton({ disabled }: { disabled: boolean }) {
   const attachments = usePromptInputAttachments();
