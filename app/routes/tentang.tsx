@@ -1,6 +1,6 @@
 import type { Route } from "./+types/tentang";
 import { Link } from "react-router";
-import { FaArrowRight, FaEnvelope } from "react-icons/fa6";
+import { FaArrowRight, FaLinkedin } from "react-icons/fa6";
 import {
   SiNodedotjs,
   SiReact,
@@ -11,9 +11,11 @@ import {
   SiDocker,
   SiN8N,
   SiLangchain,
+  SiOllama,
+  SiMistralai,
+  SiQdrant,
+  SiCloudflare
 } from "react-icons/si";
-import ragasIcon from "~/assets/ragas.svg";
-import qdrantIcon from "~/assets/qdrant.svg";
 import { Footer } from "~/components/Footer";
 import { HalalLogoIcon } from "~/components/HalalLogoIcon";
 import LogoLoop, { type LogoItem } from "~/components/LogoLoop";
@@ -114,7 +116,7 @@ const TECH_STACK_LOGOS: LogoItem[] = [
   {
     node: (
       <span className="inline-flex items-center gap-2 rounded-full border border-green-200 bg-white px-4 py-2 text-sm font-medium text-green-900 dark:border-green-800 dark:bg-green-900 dark:text-green-100">
-        <img src={qdrantIcon} alt="" className="h-4 w-4 object-contain" />
+        <SiQdrant className="text-base text-red-500" />
         Qdrant
       </span>
     ),
@@ -134,12 +136,32 @@ const TECH_STACK_LOGOS: LogoItem[] = [
   {
     node: (
       <span className="inline-flex items-center gap-2 rounded-full border border-green-200 bg-white px-4 py-2 text-sm font-medium text-green-900 dark:border-green-800 dark:bg-green-900 dark:text-green-100">
-        <img src={ragasIcon} alt="" className="h-4 w-4 object-contain" />
-        Ragas
+        <SiOllama className="text-base text-black dark:text-white" />
+        Ollama
       </span>
     ),
-    title: "Ragas",
-    ariaLabel: "Ragas",
+    title: "Ollama",
+    ariaLabel: "Ollama",
+  },
+  {
+    node: (
+      <span className="inline-flex items-center gap-2 rounded-full border border-green-200 bg-white px-4 py-2 text-sm font-medium text-green-900 dark:border-green-800 dark:bg-green-900 dark:text-green-100">
+        <SiMistralai className="text-base text-orange-500" />
+        Ministral 3 8B
+      </span>
+    ),
+    title: "Ministral 3 8B",
+    ariaLabel: "Ministral 3 8B",
+  },
+  {
+    node: (
+      <span className="inline-flex items-center gap-2 rounded-full border border-green-200 bg-white px-4 py-2 text-sm font-medium text-green-900 dark:border-green-800 dark:bg-green-900 dark:text-green-100">
+        <SiCloudflare className="text-base text-orange-500" />
+        Cloudflare
+      </span>
+    ),
+    title: "Cloudflare",
+    ariaLabel: "Cloudflare",
   },
 ];
 
@@ -168,12 +190,10 @@ export default function Tentang() {
             <div className="grid gap-4 md:grid-cols-2">
               <article className="rounded-xl border border-green-200 bg-green-50 p-5 dark:border-green-800 dark:bg-green-900/40">
                 <h2 className="mb-2 text-lg font-semibold text-green-900 dark:text-green-100">
-                  Pembuat Project
+                  Riset & Penelitian
                 </h2>
                 <p className="text-sm text-green-800 dark:text-green-300">
-                  Project ini dikembangkan oleh tim pengembang Halal Check
-                  sebagai bagian dari inisiatif solusi digital untuk kebutuhan
-                  verifikasi halal yang lebih praktis.
+                  Project ini merupakan hasil riset dan penelitian saya sebagai mahasiswa, yang berfokus pada implementasi chatbot berbasis Agentic AI (RAG) untuk membantu mempermudah akses informasi verifikasi kehalalan produk di Indonesia.
                 </p>
               </article>
 
@@ -183,12 +203,17 @@ export default function Tentang() {
                 </h2>
                 <p className="mb-3 text-sm text-green-800 dark:text-green-300">
                   Untuk kolaborasi atau pertanyaan lebih lanjut, silakan hubungi
-                  tim kami melalui email berikut.
+                  melalui LinkedIn berikut.
                 </p>
-                <div className="inline-flex items-center gap-2 text-sm font-medium text-green-700 dark:text-green-300">
-                  <FaEnvelope className="text-base" />
-                  hello@halalcheck.app
-                </div>
+                <a
+                  href="https://www.linkedin.com/in/ummamh/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-green-700 hover:text-green-900 transition-colors dark:text-green-300 dark:hover:text-green-100"
+                >
+                  <FaLinkedin className="text-base text-[#0a66c2]" />
+                  Ummam Hoerussifa
+                </a>
               </article>
             </div>
           </div>

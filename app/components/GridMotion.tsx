@@ -89,7 +89,7 @@ const GridMotion: FC<GridMotionProps> = ({ items = [], gradientColor = 'black' }
               {getRowItems(rowIndex).map((content, itemIndex) => (
                 <div key={itemIndex} className="flex-shrink-0 w-[calc(300vw/8)] md:w-[calc(200vw/10)]">
                  {/* Width item disesuaikan agar tidak terlalu lebar/sempit */}
-                  <div className="w-full h-full overflow-hidden rounded-[10px] bg-green-800 dark:bg-white flex items-center justify-center text-white dark:text-green-800 text-[1.5rem]">
+                  <div className="w-full h-full overflow-hidden rounded-[10px] bg-green-800 dark:bg-white flex items-center justify-center text-white dark:text-green-800 text-[1.5rem] relative">
                     {typeof content === 'string' && content.startsWith('http') ? (
                       <div
                         className="w-full h-full bg-cover bg-center absolute top-0 left-0"

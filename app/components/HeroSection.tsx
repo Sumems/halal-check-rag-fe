@@ -3,17 +3,66 @@ import GridMotion from "~/components/GridMotion";
 import RotatingText from "~/components/RotatingText";
 import { Button } from "~/components/ui/button";
 import { FaRobot } from "react-icons/fa6";
+import { 
+  Utensils, 
+  CupSoda, 
+  Sparkles, 
+  CheckCircle2, 
+  ShieldCheck, 
+  Leaf, 
+  Globe 
+} from "lucide-react";
+import HalalIndonesiaLogo from "../assets/Halal_Indonesia.svg";
+
+const halalLogo = (
+  <div className="absolute inset-0 bg-white flex items-center justify-center p-6">
+    <img
+      src={HalalIndonesiaLogo}
+      alt="Halal Indonesia"
+      className="h-full w-auto object-contain select-none"
+    />
+  </div>
+);
+
+// Wrapper untuk memberikan gaya visual yang konsisten pada icon
+const createIconCard = (IconComponent: any, colorClass: string = "text-green-600 dark:text-green-400") => (
+  <div className="absolute inset-0 bg-white flex items-center justify-center p-6">
+    <IconComponent className={`w-[70%] h-[70%] object-contain ${colorClass}`} />
+  </div>
+);
 
 // 28 items untuk GridMotion (4 baris x 7 kolom)
 const gridItems = [
-  // Baris 1: Mix logo BPJPH (placeholder) dan emoji
-  "🕌", "✅", "HALAL", "🍖", "☪️", "100%", "🥗",
-  // Baris 2: Teks dan simbol
-  "Aman", "🌙", "Terjamin", "🍜", "Sertifikasi", "🛡️", "Produk",
-  // Baris 3: Emoji makanan dan simbol keamanan
-  "🍲", "Halal", "✓", "🥘", "BPJPH", "🍛", "🌿",
-  // Baris 4: Variasi teks dan simbol
-  "Cek", "🥙", "Indonesia", "☑️", "Makanan", "🍱", "💚",
+  // Baris 1
+  halalLogo,
+  "HALAL",
+  createIconCard(Utensils),
+  "Aman",
+  createIconCard(Sparkles, "text-pink-500 dark:text-pink-400"),
+  "Minuman",
+  createIconCard(CupSoda),
+  // Baris 2
+  "Sertifikasi",
+  createIconCard(Leaf, "text-emerald-500"),
+  "Produk",
+  halalLogo,
+  "Cek",
+  createIconCard(ShieldCheck),
+  // Baris 3
+  "Indonesia",
+  createIconCard(Utensils),
+  "Halal",
+  halalLogo,
+  "Makanan",
+  createIconCard(CupSoda),
+  // Baris 4
+  "Agentic AI",
+  createIconCard(Sparkles, "text-pink-500 dark:text-pink-400"),
+  "Kosmetik",
+  createIconCard(Globe),
+  "✓",
+  createIconCard(ShieldCheck),
+  halalLogo,
 ];
 
 export function HeroSection() {
