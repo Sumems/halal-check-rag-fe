@@ -6,6 +6,5 @@
 /.react-router/
 /build/
 rules.txt
-pnpm-lock.yaml
 
 temp/

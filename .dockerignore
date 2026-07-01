@@ -5,4 +5,3 @@ README.md
 temp/
 rules.txt
 .env
-pnpm-lock.yaml
