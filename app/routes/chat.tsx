@@ -282,7 +282,7 @@ export default function Chat() {
                   chunk = { type: "item", content: line };
                 }
 
-                if (chunk.type === "begin" && !activeNodeId && chunk.metadata) {
+                if (chunk.type === "begin" && chunk.metadata?.nodeName === "SummaryAgent") {
                   activeNodeId = chunk.metadata.nodeId;
                 }
 
