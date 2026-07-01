@@ -276,6 +276,9 @@ export default function Chat() {
                 try {
                   chunk = JSON.parse(line);
                 } catch {
+                  if (accumulated) {
+                    continue;
+                  }
                   chunk = { type: "item", content: line };
                 }
 
@@ -321,9 +324,14 @@ export default function Chat() {
 
           setStatus("ready");
         } else {
-          const data = await response.json();
-          const assistantText =
-            data.output ?? data.text ?? data.message ?? data.response ?? "";
+          let assistantText = "";
+          try {
+            const data = await response.json();
+            assistantText =
+              data.output ?? data.text ?? data.message ?? data.response ?? "";
+          } catch {
+            assistantText = await response.text();
+          }
 
           setMessages((prev) => [
             ...prev,
