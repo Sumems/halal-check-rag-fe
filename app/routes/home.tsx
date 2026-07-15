@@ -69,7 +69,7 @@ export default function Home() {
                   Pencarian Cerdas
                 </h3>
                 <p className="text-green-100/70">
-                  Cari produk dengan nama, merek, atau barcode untuk mendapatkan
+                  Cari produk dengan nama atau merek untuk mendapatkan
                   informasi kehalalan instan
                 </p>
               </div>

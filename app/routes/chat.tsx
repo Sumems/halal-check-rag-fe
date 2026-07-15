@@ -92,17 +92,9 @@ const SUGGESTION_ITEMS: SuggestionItem[] = [
     icon: <FaUtensils className="text-green-600 dark:text-green-400" />,
   },
   {
-    label: "Bagaimana cara cek sertifikat halal BPJPH?",
-    icon: <FaCertificate className="text-green-600 dark:text-green-400" />,
-  },
-  {
     label: "Apa bedanya label halal BPJPH dan MUI?",
     icon: <FaMosque className="text-green-600 dark:text-green-400" />,
-  },
-  {
-    label: "Produk kosmetik apa yang sudah bersertifikat halal?",
-    icon: <FaFlask className="text-green-600 dark:text-green-400" />,
-  },
+  }
 ];
 
 function generateSessionId(): string {
