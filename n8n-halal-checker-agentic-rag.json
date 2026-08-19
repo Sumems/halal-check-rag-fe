@@ -1,0 +1,1341 @@
+{
+  "name": "Halal Checker - Qdrant + Fallback BPJPH v2",
+  "nodes": [
+    {
+      "parameters": {
+        "model": "indo-sentence-bert-large:latest"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
+      "typeVersion": 1,
+      "position": [
+        -41696,
+        -4032
+      ],
+      "id": "2057d2e2-4449-4964-82c8-e12f05c3e147",
+      "name": "Embeddings Ollama Retrieve",
+      "credentials": {
+        "ollamaApi": {
+          "id": "PzuPxmBX1yYz0hYq",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}{{ $binary.data ? $binary.data.fileName : \"\" }}",
+        "options": {
+          "systemMessage": "=Anda adalah Orchestrator Chat AI Halal Checker yang sangat disiplin, teliti, dan anti-halusinasi.\n\n### ATURAN KRITIS (WAJIB 100% DIPATUHI):\n- Jika ada gambar produk → otomatis intent = \"halal_check\".\n- Prioritaskan analisis gambar terlebih dahulu.\n- **JANGAN PERNAH MENGARANG** informasi yang tidak jelas terlihat di gambar atau disebutkan user.\n- Output **HARUS** hanya satu object JSON murni. Tidak boleh ada teks lain di luar JSON.\n\n### ATURAN PENGISIAN FIELD (SANGAT PENTING):\n\n- `nama_pelaku_usaha`: **Hanya diisi** jika nama perusahaan (PT. xxx, CV. xxx, dll) **jelas terbaca** di gambar atau disebutkan secara eksplisit oleh user. Jika tidak ada atau tidak yakin 100% → isi **\"\"** (string kosong). \n  → Jangan pernah menebak atau menulis \"PT. [Nama Pelaku Usaha Energen]\" atau sejenisnya.\n\n- `nama_produk`: Brand + nama produk yang terbaca jelas di gambar atau disebut user. Jangan karang.\n- `product_query`: Sama seperti `nama_produk`, digunakan untuk pencarian.\n- `no_sertifikat`: Hanya jika nomor sertifikat terlihat jelas di gambar/user → jika tidak → \"\".\n- `intent`: \"halal_check\" jika ada gambar suatu produk, \"informational\" jika pertanyaan umum, dll.\n\n### FIELD OUTPUT LENGKAP (semua harus ada):\n\n{\n  \"chatInput\": \"string persis input user\",\n  \"raw_query\": \"chatInput dengan whitespace dirapikan\",\n  \"product_query\": \"Brand + Nama Produk\",\n  \"page\": 1,\n  \"size\": 10,\n  \"nama_produk\": \"Brand + Nama Produk atau \\\"\\\"\",\n  \"nama_pelaku_usaha\": \"Nama perusahaan yang TERBACA JELAS atau \\\"\\\"\",\n  \"no_sertifikat\": \"Nomor sertifikat yang terbaca jelas atau \\\"\\\"\",\n  \"intent\": \"halal_check | informational | smalltalk | unclear\",\n  \"user_facing_reply\": \"jawaban sopan untuk user\",\n  \"output\": \"string JSON kompak berisi intent dan user_facing_reply\"\n}\n\n### CONTOH OUTPUT SAAT GAMBAR (BENAR):\n\n{\n  \"chatInput\": \"Ini gimana? Udah halal belum?\",\n  \"raw_query\": \"Ini gimana? Udah halal belum?\",\n  \"product_query\": \"Indomie Mi Instan\",\n  \"page\": 1,\n  \"size\": 10,\n  \"nama_produk\": \"Indomie Mi Instan\",\n  \"nama_pelaku_usaha\": \"\",\n  \"no_sertifikat\": \"\",\n  \"intent\": \"halal_check\",\n  \"user_facing_reply\": \"Baik, saya akan cek status halal Indomie Mi Instan dari gambar yang Anda kirim...\",\n  \"output\": \"{\\\"intent\\\":\\\"halal_check\\\",\\\"user_facing_reply\\\":\\\"Baik, saya akan cek status halal Energen Chocolate Cereal Mix...\\\"}\"\n}\n\n### CONTOH SALAH YANG HARUS DIHINDARI:\n- Jangan isi `nama_pelaku_usaha` dengan \"PT. [Nama Pelaku Usaha Energen]\" atau tebakan apa pun.\n\n**Instruksi Akhir**: \n- Jika tidak yakin 100% untuk `nama_pelaku_usaha`, `no_sertifikat`, atau nama produk → kosongkan (\"\").\n- Output Anda **hanya JSON**, mulai dengan { dan akhiri dengan }.",
+          "enableStreaming": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -42272,
+        -4416
+      ],
+      "id": "20fd0d91-ec22-4a06-b44c-e12509af547c",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "functionCode": "function cleanJsonString(str) {\n  if (!str || typeof str !== 'string') return '';\n  \n  let t = str.trim();\n  \n  // Hapus semua code fences (bisa berlapis)\n  t = t.replace(/```(?:json)?\\s*([\\s\\S]*?)```/gi, '$1').trim();\n  t = t.replace(/^`+|`+$/g, '').trim();\n  \n  return t;\n}\n\nfunction robustParseJson(text) {\n  if (!text || typeof text !== 'string') return null;\n  \n  let cleaned = cleanJsonString(text);\n  \n  // Coba 1: Parse langsung\n  try { return JSON.parse(cleaned); } catch (e) {}\n  \n  // Coba 2: Bersihkan escaped quotes berlebih\n  cleaned = cleaned\n    .replace(/\\\\\"/g, '\"')           // \\\\\\\" → \"\n    .replace(/\\\\\\\\/g, '\\\\')         // hapus double escape\n    .replace(/\\n/g, ' ')            // normalisasi newline\n    .replace(/\\s+/g, ' ');          // normalisasi whitespace\n  \n  try { return JSON.parse(cleaned); } catch (e) {}\n  \n  // Coba 3: Ambil JSON object terbesar\n  const start = cleaned.indexOf('{');\n  const end = cleaned.lastIndexOf('}');\n  \n  if (start >= 0 && end > start) {\n    let candidate = cleaned.slice(start, end + 1);\n    try { \n      return JSON.parse(candidate); \n    } catch (e) {}\n    \n    // Coba bersihkan sekali lagi\n    candidate = candidate.replace(/\\\\\"/g, '\"');\n    try { return JSON.parse(candidate); } catch (e) {}\n  }\n  \n  return null;\n}\n\n// ================== MAIN LOGIC ==================\nconst item = $input.first().json;\nlet raw = item.output || item.text || item;\n\n// Jika sudah object\nif (raw && typeof raw === 'object' && !Array.isArray(raw)) {\n  parsed = raw;\n} else {\n  parsed = robustParseJson(typeof raw === 'string' ? raw : JSON.stringify(raw));\n}\n\n// Fallback chatInput\nconst chatIn = \n  $('Edit Fields').first()?.json?.chatInput || \n  $('Edit Fields').first()?.json?.body?.chatInput || \n  item.chatInput || '';\n\nif (!parsed || typeof parsed !== 'object') {\n  parsed = {\n    chatInput: chatIn,\n    raw_query: chatIn,\n    product_query: '',\n    page: 1,\n    size: 10,\n    nama_produk: '',\n    nama_pelaku_usaha: '',\n    no_sertifikat: '',\n    intent: 'unclear',\n    user_facing_reply: 'Maaf, saya tidak bisa memproses permintaan. Silakan coba lagi dengan menyebut nama produk.',\n    output: JSON.stringify({ intent: 'unclear', user_facing_reply: 'Maaf, saya tidak bisa memproses permintaan...' })\n  };\n}\n\n// Normalisasi\nparsed.chatInput = parsed.chatInput ?? chatIn;\nparsed.raw_query = parsed.raw_query ?? chatIn;\nparsed.product_query = parsed.product_query ?? parsed.nama_produk ?? '';\nparsed.page = Number(parsed.page) || 1;\nparsed.size = Number(parsed.size) || 10;\nparsed.nama_produk = parsed.nama_produk ?? '';\nparsed.nama_pelaku_usaha = parsed.nama_pelaku_usaha ?? '';\nparsed.no_sertifikat = parsed.no_sertifikat ?? '';\nparsed.intent = ['smalltalk', 'halal_check', 'unclear', 'informational'].includes(parsed.intent) \n  ? parsed.intent \n  : 'unclear';\n\nparsed.user_facing_reply = parsed.user_facing_reply ?? '';\n\nif (!parsed.output || typeof parsed.output === 'string') {\n  parsed.output = JSON.stringify({\n    intent: parsed.intent,\n    user_facing_reply: parsed.user_facing_reply\n  });\n}\n\nreturn [{ json: { ...item, output: parsed } }];"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -42000,
+        -4416
+      ],
+      "id": "baa08480-8ae5-484e-9166-b359cbe3dba0",
+      "name": "Parse AI Agent JSON"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d6fbe0b9-8f1b-4f34-aac7-9a3a62f54a9e",
+              "leftValue": "={{ $json.output?.intent || $json.intent }}",
+              "rightValue": "halal_check",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ead3c32f-fcfa-4024-9ad8-bf2ece1ca6ee",
+      "name": "IF - Intent halal_check?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -41840,
+        -4416
+      ]
+    },
+    {
+      "parameters": {
+        "multipleMethods": true,
+        "path": "17a5fd78-3ba9-466a-b1dc-ff07864b2f43-v2",
+        "authentication": "headerAuth",
+        "responseMode": "streaming",
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -42080,
+        -4016
+      ],
+      "id": "df96cfc9-8052-4898-a618-1f7ddd02432a",
+      "name": "Webhook",
+      "webhookId": "17a5fd78-3ba9-466a-b1dc-ff07864b2f43-v2",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Msu5c9DlfZKvs1A4",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.sessionId }} {{ $json.body.sessionId }} "
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -42096,
+        -4176
+      ],
+      "id": "153f0b40-bc21-4207-b23a-efa6f03853b1",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "34a5e8ed-2fc6-4809-ace2-11f1454190d2",
+              "name": "chatInput",
+              "value": "={{ $json?.chatInput || $json.body.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "2c77549a-d2fc-4e4a-ae60-8b00e4612b32",
+              "name": "sessionId",
+              "value": "={{ $json?.sessionId || $json.body.sessionId}}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -42432,
+        -4400
+      ],
+      "id": "8e087b3a-3c13-4d99-9e4e-49bd13d841a4",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "functionCode": "const items = $input.all();\n\n// Fungsi untuk mengekstrak dan mem-parsing metadata dari string pageContent\nfunction parsePageContent(content) {\n  const result = {\n    nama_produk: '',\n    nama_pelaku_usaha: '',\n    no_sertifikat: '',\n    tgl_terbit: '',\n  };\n  \n  if (!content || typeof content !== 'string') return result;\n\n  const parts = content.split('|');\n  for (const part of parts) {\n    const colonIdx = part.indexOf(':');\n    if (colonIdx >= 0) {\n      const key = part.slice(0, colonIdx).trim().toLowerCase();\n      const val = part.slice(colonIdx + 1).trim();\n\n      if (key.includes('nama produk') || key.includes('product name')) {\n        result.nama_produk = val;\n      } else if (key.includes('pelaku') || key.includes('company') || key.includes('manufacture')) {\n        result.nama_pelaku_usaha = val;\n      } else if (key.includes('tanggal terbit') || key.includes('issued')) {\n        result.tgl_terbit = val;\n      } else if (key.includes('sertifikat') || key.includes('cert')) {\n        result.no_sertifikat = val;\n      }\n    }\n  }\n  return result;\n}\n\nfunction parseNumber(v) {\n  if (typeof v === 'number' && Number.isFinite(v)) return v;\n  if (typeof v === 'string') {\n    const n = Number(v.trim());\n    return Number.isFinite(n) ? n : null;\n  }\n  return null;\n}\n\nfunction pickScore(obj) {\n  if (!obj || typeof obj !== 'object') return null;\n  const candidates = [obj.score, obj.similarity, obj._score, obj.distance];\n  for (const v of candidates) {\n    const n = parseNumber(v);\n    if (n !== null) return n;\n  }\n  return null;\n}\n\n// Proses semua dokumen Qdrant ke bentuk JSON terstruktur\nconst parsedResults = items.map((it) => {\n  const pageContent = it.json.document?.pageContent || '';\n  const parsedMetadata = parsePageContent(pageContent);\n  return {\n    score: pickScore(it.json),\n    ...parsedMetadata,\n  };\n});\n\nconst scores = parsedResults.map(r => r.score).filter((v) => v !== null);\nconst maxScore = scores.length ? Math.max(...scores) : null;\nconst count = parsedResults.length;\n\nreturn [\n  {\n    json: {\n      qdrant_results_count: count,\n      qdrant_max_score: maxScore,\n      qdrant_results: parsedResults, // Hanya berisi data murni Qdrant ter-parsing\n    },\n  },\n];\n"
+      },
+      "id": "6ddb1957-5df2-4e58-8712-d487f8f32e81",
+      "name": "Pack Qdrant Results",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -41248,
+        -4464
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1c8a2e1f-7a6d-4e6a-9b6e-5a3a53f6d8b1",
+              "leftValue": "={{ $json.qdrant_relevancy }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f964365a-dc33-412d-9766-5a69e3be03a4",
+      "name": "IF - Qdrant Ada Hasil?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -40544,
+        -4464
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "timezone": "Asia/Jakarta"
+        }
+      },
+      "type": "n8n-nodes-base.dateTimeTool",
+      "typeVersion": 2,
+      "position": [
+        -41952,
+        -4176
+      ],
+      "id": "f53a619d-5d82-4e92-b075-62bb4a7fcb13",
+      "name": "Date & Time"
+    },
+    {
+      "parameters": {
+        "model": "ministral-3:8b",
+        "options": {
+          "mainGpu": 0,
+          "numBatch": 8192,
+          "penalizeNewline": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -41072,
+        -3936
+      ],
+      "id": "79d6363f-6264-4c46-a114-3175f43e01e6",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "PzuPxmBX1yYz0hYq",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "public": true,
+        "availableInChat": true,
+        "options": {
+          "allowedOrigins": "*",
+          "allowFileUploads": true,
+          "allowedFilesMimeTypes": "*"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -42304,
+        -4176
+      ],
+      "id": "3d38ab53-020e-4e71-9f32-7174291a8371",
+      "name": "When chat message received",
+      "webhookId": "a4242f5d-6aa6-4bd2-95e3-a5f5e8475b75-v2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dfc78e69-1bfb-4f0e-a215-e7d69476dc61",
+              "name": "page",
+              "value": "={{ $json.page || $('Parse AI Agent JSON').first().json.output?.page || 1 }}",
+              "type": "number"
+            },
+            {
+              "id": "76c08e4b-a5fb-4b26-beb0-7d5f1c3a50ff",
+              "name": "size",
+              "value": "={{ $json.size || $('Parse AI Agent JSON').first().json.output?.size || 10 }}",
+              "type": "number"
+            },
+            {
+              "id": "f64f6bd2-0a4f-488a-903d-3d804f283bb8",
+              "name": "nama_produk",
+              "value": "={{ $('Parse AI Agent JSON').first().json.output?.nama_produk || $('Parse AI Agent JSON').first().json.output?.product_query || $('Parse AI Agent JSON').first().json.output?.raw_query || $json.nama_produk || $json.product_query || $json.raw_query || $json.chatInput || $('Edit Fields').first().json.chatInput || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "ad11a18c-1aa7-4cd4-a0c8-2d2b44d7d6c7",
+              "name": "nama_pelaku_usaha",
+              "value": "={{ $json.nama_pelaku_usaha || $('Parse AI Agent JSON').first().json.output?.nama_pelaku_usaha || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "d7c11ac0-56da-47f6-95a2-faa5a2a9ea5e",
+              "name": "no_sertifikat",
+              "value": "={{ $json.no_sertifikat || $('Parse AI Agent JSON').first().json.output?.no_sertifikat || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "e1f0624b-088f-4411-9490-3647c1217180",
+      "name": "Ekstrak Nama Produk (fallback v2)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -41248,
+        -4160
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "=WAJIB: Panggil tool ini tepat satu kali untuk mengambil data sertifikat halal BPJPH v2 (Indonesia/lokal) dari API halal-certificate-list. Jangan menjawab user sebelum tool ini sukses dipanggil. Isi query: page, size, nama_produk (singkat), no_sertifikat, nama_pelaku_usaha. Respons = JSON body API mentah.",
+        "url": "https://prod-api-si.halal.go.id/api/v2/dashboard/halal-certificate-list",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters0_Value', `Gunakan page untuk pagination dari input. Default: 1.`, 'string') }}"
+            },
+            {
+              "name": "size",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters1_Value', `Gunakan size untuk pagination dari input. Default: 10.`, 'string') }}"
+            },
+            {
+              "name": "nama_produk",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters2_Value', `Hanya nama produk/merek sesuai yang sudah didapatkan dari informasi yang ada untuk query API (bukan kalimat chat penuh). Contoh: soy sauce, Indomie. Jangan sertakan pertanyaan atau filler.`, 'string') }}"
+            },
+            {
+              "name": "no_sertifikat",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters3_Value', `Nomor sertifikat halal BPJPH (kosongkan jika tidak diketahui).`, 'string') }}"
+            },
+            {
+              "name": "nama_pelaku_usaha",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters4_Value', `Nama produsen/importer/PT jika disebut user (kosongkan jika tidak ada). `, 'string') }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        -40928,
+        -3936
+      ],
+      "id": "0eb1864f-005a-4572-93ce-99ab128ffe23",
+      "name": "BPJPH v2 - Lokal (Tool)",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 4000
+    },
+    {
+      "parameters": {
+        "functionCode": "function extractJsonText(s) {\n  if (s == null) return '';\n  let t = String(s).trim();\n  const fence = /```(?:json)?\\s*([\\s\\S]*?)```/i.exec(t);\n  if (fence) t = fence[1].trim();\n  return t;\n}\n\nfunction parseJsonObject(s) {\n  const t = extractJsonText(s);\n  if (!t) return null;\n  try {\n    return JSON.parse(t);\n  } catch (e) {\n    const start = t.indexOf('{');\n    const end = t.lastIndexOf('}');\n    if (start >= 0 && end > start) {\n      try {\n        return JSON.parse(t.slice(start, end + 1));\n      } catch (e2) {}\n    }\n  }\n  return null;\n}\n\nconst root = $input.first().json;\nlet raw = root.output;\nlet parsed = null;\nif (raw != null && typeof raw === 'object' && raw.data !== undefined) {\n  parsed = raw;\n} else {\n  parsed = parseJsonObject(typeof raw === 'string' ? raw : root.text ?? '');\n}\n\nif (!parsed || typeof parsed !== 'object' || parsed.data === undefined) {\n  parsed = { data: { datas: [] } };\n}\nif (!parsed.data || typeof parsed.data !== 'object') {\n  parsed.data = { datas: [] };\n}\nif (!Array.isArray(parsed.data.datas)) {\n  parsed.data.datas = [];\n}\n\nreturn [{ json: { ...root, output: parsed } }];"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -40720,
+        -4160
+      ],
+      "id": "59f6e812-d22e-4cff-a7d4-dad71cad3e46",
+      "name": "Parse BPJPH Lokal JSON"
+    },
+    {
+      "parameters": {
+        "toolDescription": "WAJIB: Panggil tool ini tepat satu kali untuk mengambil data sertifikat halal BPJPH v2 (luar negeri/RSHLN) dari API halal-certificate-rshln-list. Jangan menjawab user sebelum tool ini sukses dipanggil. Isi query: page, size, nama_produk (singkat), no_sertifikat, nama_pelaku_usaha. Respons = JSON body API mentah.",
+        "url": "https://prod-api-si.halal.go.id/api/v2/dashboard/halal-certificate-rshln-list",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters1_Value', `Gunakan page untuk pagination dari input. Default: 1.`, 'number') }}"
+            },
+            {
+              "name": "size",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters2_Value', `Gunakan size untuk pagination dari input. Default: 10.`, 'number') }}"
+            },
+            {
+              "name": "nama_produk",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters3_Value', `Hanya nama produk/merek singkat untuk query API (bukan kalimat chat penuh). Contoh: soy sauce. Jangan sertakan pertanyaan atau filler.`, 'string') }}"
+            },
+            {
+              "name": "no_sertifikat",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters4_Value', `Nomor sertifikat halal BPJPH (kosongkan jika tidak diketahui).`, 'string') }}"
+            },
+            {
+              "name": "nama_pelaku_usaha",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters5_Value', `Nama produsen/importer/PT jika disebut user (kosongkan jika tidak ada).`, 'string') }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        -40400,
+        -3728
+      ],
+      "id": "5eb455fd-feb3-4662-801c-886c156567f8",
+      "name": "BPJPH v2 - Luar Negeri (Tool)",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 4000
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify({\n  source: 'orchestrator_dan_chat_user',\n  chat_input: $('Edit Fields').first().json.chatInput ?? $('Edit Fields').first().json.body?.chatInput ?? '',\n  orchestrator_intent: $('Parse AI Agent JSON').first().json.output?.intent,\n  product_query: $('Parse AI Agent JSON').first().json.output?.product_query || '',\n  raw_query: $('Parse AI Agent JSON').first().json.output?.raw_query || '',\n  orchestrator_output_excerpt: String($('Parse AI Agent JSON').first().json.output?.output ?? '').slice(0, 800),\n\n  page: $json.page || $('Parse AI Agent JSON').first().json.output?.page || 1,\n  size: $json.size || $('Parse AI Agent JSON').first().json.output?.size || 10,\n\n  parse_nama_produk: $('Parse AI Agent JSON').first().json.output?.nama_produk || '',\n  parse_nama_pelaku_usaha: $('Parse AI Agent JSON').first().json.output?.nama_pelaku_usaha || '',\n  parse_no_sertifikat: $('Parse AI Agent JSON').first().json.output?.no_sertifikat || '',\n\n  set_nama_produk: $json.nama_produk || '',\n  set_nama_pelaku_usaha: $json.nama_pelaku_usaha || '',\n  set_no_sertifikat: $json.no_sertifikat || ''\n}, null, 2) }}",
+        "options": {
+          "systemMessage": "=Anda adalah agen eksekusi API BPJPH v2 (luar negeri/RSHLN). Anda punya SATU tool HTTP saja.\n\nUrutan WAJIB:\n1) Panggil tool tepat SATU kali.\n2) Setelah tool selesai: SATU JSON murni (tanpa markdown): {\"data\":<salin body API persis>}.\nJika gagal/kosong: {\"data\":{\"datas\":[]}}.\n\nKonteks: `chat_input`, `product_query`, `raw_query`, `set_nama_produk`, `parse_nama_pelaku_usaha`, `parse_no_sertifikat`, `set_nama_pelaku_usaha`, `set_no_sertifikat`.\n\nArgumen tool: nama_produk pendek; page/size; no_sertifikat, nama_pelaku_usaha jika ada.\n\nJangan mengarang `data` sebelum tool dipanggil.",
+          "maxIterations": 20,
+          "enableStreaming": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -40544,
+        -3920
+      ],
+      "id": "0195cd41-3980-4c73-8dc5-0b66598afe6c",
+      "name": "BPJPH v2 Luar Negeri Tool Agent"
+    },
+    {
+      "parameters": {
+        "functionCode": "function extractJsonText(s) {\n  if (s == null) return '';\n  let t = String(s).trim();\n  const fence = /```(?:json)?\\s*([\\s\\S]*?)```/i.exec(t);\n  if (fence) t = fence[1].trim();\n  return t;\n}\n\nfunction parseJsonObject(s) {\n  const t = extractJsonText(s);\n  if (!t) return null;\n  try {\n    return JSON.parse(t);\n  } catch (e) {\n    const start = t.indexOf('{');\n    const end = t.lastIndexOf('}');\n    if (start >= 0 && end > start) {\n      try {\n        return JSON.parse(t.slice(start, end + 1));\n      } catch (e2) {}\n    }\n  }\n  return null;\n}\n\nconst root = $input.first().json;\nlet raw = root.output;\nlet parsed = null;\nif (raw != null && typeof raw === 'object' && raw.data !== undefined) {\n  parsed = raw;\n} else {\n  parsed = parseJsonObject(typeof raw === 'string' ? raw : root.text ?? '');\n}\n\nif (!parsed || typeof parsed !== 'object' || parsed.data === undefined) {\n  parsed = { data: { datas: [] } };\n}\nif (!parsed.data || typeof parsed.data !== 'object') {\n  parsed.data = { datas: [] };\n}\nif (!Array.isArray(parsed.data.datas)) {\n  parsed.data.datas = [];\n}\n\nreturn [{ json: { ...root, output: parsed } }];"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -40176,
+        -3920
+      ],
+      "id": "4722899b-5be4-47c8-8fc8-0e52c5948a79",
+      "name": "Parse BPJPH Luar Negeri JSON"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c8a8d154-06d7-48fa-97fd-1a6d35f10fef",
+              "leftValue": "={{ (($json.data?.datas ?? $json.data?.data?.datas) || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "larger"
+              }
+            },
+            {
+              "id": "2125aa09-68b1-4fce-8924-689518ed2950",
+              "leftValue": "={{ $json.output.data.datas }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "id": "d15bade4-6532-4d9c-9972-0a5e8ff62d74",
+      "name": "IF - Lokal Ada Data?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -40480,
+        -4160
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const items = $input.all();\nconst lines = items.map(i => i.json.displayLine).filter(Boolean);\n\nreturn [{\n  json: {\n    responseBody: lines.length ? lines.join('\\n') : 'Maaf, data tidak ditemukan.'\n  }\n}];"
+      },
+      "id": "edaba6d9-8b76-4c8a-abd1-3b8032597048",
+      "name": "Build Response (fallback v2)",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -39616,
+        -3936
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "function stableHash(obj) {\n  const json = JSON.stringify(obj, Object.keys(obj).sort());\n  let h1 = 2166136261 >>> 0;\n  let h2 = 5381 >>> 0;\n  for (let i = 0; i < json.length; i++) {\n    const c = json.charCodeAt(i);\n    h1 ^= c;\n    h1 = Math.imul(h1, 16777619) >>> 0;\n    h2 = ((h2 << 5) + h2 + c) >>> 0;\n  }\n  return 'fnv_' + h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0') + '_' + json.length.toString(16);\n}\n\nfunction pickLokalFields(row) {\n  const namaProduk = row.nama_produk || '';\n  const pelaku =\n    typeof row.pelaku_usaha === 'string'\n      ? row.pelaku_usaha\n      : row.pelaku_usaha?.nama_pelaku_usaha || '';\n  const noSer = row.no_sertifikat ?? row.sertifikat?.no_sertifikat ?? '';\n  const tglTerbit =\n    row.tgl_terbit_sertifikat ?? row.sertifikat?.tgl_terbit_sertifikat ?? '';\n  const jenisProduk = row.pengajuan?.jenis_produk;\n  const jenisLayanan = row.pengajuan?.jenis_layanan;\n  return { namaProduk, pelaku, noSer, tglTerbit, jenisProduk, jenisLayanan };\n}\n\nconst datas = $json.output.data?.datas ?? $json.data?.data?.datas ?? [];\n\nreturn datas.map((row) => {\n  const f = pickLokalFields(row);\n  const payload = {\n    source: 'bpjph_lokal_v2',\n    id: row.id,\n    nama_produk: row.nama_produk,\n    pelaku_usaha: row.pelaku_usaha,\n    pengajuan: row.pengajuan,\n    sertifikat: row.sertifikat,\n  };\n\n  const parts = [\n    f.pelaku ? `Pelaku usaha: ${f.pelaku}` : null,\n    f.namaProduk ? `Nama produk: ${f.namaProduk}` : null,\n    f.noSer ? `No sertifikat: ${f.noSer}` : null,\n    f.tglTerbit ? `Tanggal terbit sertifikat: ${f.tglTerbit}` : null,\n  ];\n  if (f.jenisProduk && f.jenisProduk !== '-') {\n    parts.push(`Jenis produk: ${f.jenisProduk}`);\n  }\n  if (f.jenisLayanan && f.jenisLayanan !== '-') {\n    parts.push(`Jenis layanan: ${f.jenisLayanan}`);\n  }\n\n  const content = parts.filter(Boolean).join(' | ');\n\n  return {\n    json: {\n      content,\n      metadata: {\n        ...payload,\n        dedup_hash: stableHash(payload),\n      },\n      displayLine: `${f.namaProduk} — ${f.pelaku || '-'} — ${f.noSer || '-'}`,\n    },\n  };\n});"
+      },
+      "id": "11e5bf5f-e35a-4ae3-91a3-721189dd86e6",
+      "name": "Normalize BPJPH Lokal - Test",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -40208,
+        -4160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c8a8d154-06d7-48fa-97fd-1a6d35f10fef",
+              "leftValue": "={{ (($json.data?.datas ?? $json.data?.data?.datas) || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "larger"
+              }
+            },
+            {
+              "id": "2125aa09-68b1-4fce-8924-689518ed2950",
+              "leftValue": "={{ $json.output.data.datas }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "id": "64590dc7-2b06-4b37-b1f5-a8b5ec1a2bcd",
+      "name": "IF - Lokal Ada Data?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -39936,
+        -3920
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "load",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "daftar-sertifikasi-halal-1024",
+          "mode": "list",
+          "cachedResultName": "daftar-sertifikasi-halal-1024"
+        },
+        "prompt": "={{ $json.output.nama_produk}}{{ $json.output.nama_pelaku_usaha }}",
+        "topK": 10,
+        "includeDocumentMetadata": false,
+        "options": {
+          "contentPayloadKey": "content",
+          "metadataPayloadKey": "metadata"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        -41568,
+        -4464
+      ],
+      "id": "432d70e6-cd47-48f0-b9be-8a3b14bd3c27",
+      "name": "Sertifikat_Halal (Get Many)",
+      "credentials": {
+        "qdrantApi": {
+          "id": "PQfWxEBYx3f4ARi4",
+          "name": "QdrantApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const input = $input.first().json;\n\nlet rawText = input.output || input.text || JSON.stringify(input);\n\n// Step 1: Hilangkan markdown code block\nrawText = rawText\n    .replace(/```json\\s*/i, '')\n    .replace(/```\\s*$/, '')\n    .trim();\n\n// Step 2: Extract JSON object yang paling luar\nlet parsed;\n\ntry {\n    // Coba parse langsung\n    parsed = JSON.parse(rawText);\n} catch (e) {\n    // Jika gagal, cari pola JSON dengan regex yang lebih baik\n    const jsonRegex = /\\{\\s*\"qdrant_relevancy\"\\s*:\\s*(true|false)[\\s\\S]*?\"final_answer\"\\s*:\\s*\"([\\s\\S]*?)\"\\s*\\}/;\n    const match = rawText.match(jsonRegex);\n    \n    if (match) {\n        const isRelevant = match[1] === 'true';\n        let finalAnswer = match[2];\n        \n        // Bersihkan escape characters di final_answer\n        finalAnswer = finalAnswer\n            .replace(/\\\\n/g, '\\n')\n            .replace(/\\\\\"/g, '\"')\n            .replace(/\\\\\\\\/g, '\\\\');\n        \n        parsed = {\n            qdrant_relevancy: isRelevant,\n            final_answer: finalAnswer\n        };\n    } else {\n        // Fallback\n        parsed = {\n            qdrant_relevancy: false,\n            final_answer: rawText\n        };\n    }\n}\n\n// Output akhir sesuai keinginanmu\nreturn [{\n    json: {\n        qdrant_relevancy: parsed.qdrant_relevancy ?? false,\n        final_answer: parsed.final_answer ?? \"\"\n    }\n}];"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -40752,
+        -4464
+      ],
+      "id": "504e50fa-c1cd-4ee6-a6fd-a8b05976d079",
+      "name": "Parse AI Agent Validator JSON"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify({ chatInput: $('Edit Fields').item.json.chatInput, nama_produk:$('Parse AI Agent JSON').item.json.output.raw_query, nama_pelaku_usaha:$('Parse AI Agent JSON').item.json.output.nama_pelaku_usaha,qdrant_result: $json.qdrant_results}, null, 2) }}",
+        "options": {
+          "systemMessage": "=Anda adalah ValidatorAgent BPJPH. Tugas Anda adalah memvalidasi jawaban Orchestrator sebelum diberikan ke user agar selalu meyakinkan, berbasis bukti, dan akurat.\n\n### TUGAS UTAMA:\nBandingkan **Input Pengguna** dengan **Hasil Pencarian Database (Qdrant)** secara objektif dan kritis.\n\nInput Pengguna:\n{{ JSON.stringify($('Parse AI Agent JSON').item.json.output, null, 2) }}\n{{ $binary.data ? \"[GAMBAR TERLAMPIR: \" + $binary.data.fileName + \"]\" : \"\" }}\n\nHasil Pencarian Database (Qdrant):\n{{ JSON.stringify($json.qdrant_results, null, 2) }}\n\n### CHECKLIST VALIDASI (WAJIB DIPERIKSA):\n- Analisis kesamaan semantik dan kesesuaian antara Input Pengguna dengan dokumen di Qdrant.\n- Nama produk, brand, dan nomor sertifikat **tidak boleh diterjemahkan atau diparaphrase**. Harus persis sesuai data asli di database.\n- Harus ada bukti kuat: nomor sertifikat, issued_date, exp_date, atau kecocokan yang jelas.\n- Jangan menerima kecocokan yang lemah atau samar-samar.\n\n### KRITERIA KEPUTUSAN:\n- **qdrant_relevancy = true** → Jika:\n  - Ada kecocokan yang kuat dan jelas antara input user dengan hasil Qdrant.\n  - Terdapat bukti valid (minimal nomor sertifikat atau data produk yang sangat mirip).\n  - Nama produk/brand sesuai dengan yang ada di database.\n\n- **qdrant_relevancy = false** → Jika:\n  - Tidak ada hasil yang relevan.\n  - Kecocokan lemah atau hanya berdasarkan kata kunci saja.\n  - Tidak ada bukti sertifikat yang jelas.\n  - Hasil Qdrant kosong atau tidak cocok.\n\n### KELUARAN HARUS BERUPA JSON MURNI:\n{\n  \"qdrant_relevancy\": boolean,\n  \"final_answer\": \"string\"\n}\n\n### CONTOH OUTPUT YANG BENAR:\n\n{\n  \"qdrant_relevancy\": true,\n  \"final_answer\": \"Produk Energen Chocolate Cereal Mix memiliki sertifikat halal dengan nomor XXXXXXXX yang masih berlaku hingga 2027. Status: Halal.\"\n}\n\n{\n  \"qdrant_relevancy\": false,\n  \"final_answer\": \"Tidak ditemukan data yang sesuai di database BPJPH untuk produk yang dimaksud. Mohon periksa kembali nama produk atau kirim foto kemasan yang lebih jelas.\"\n}\n\n**ATURAN AKHIR YANG SANGAT PENTING**:\n- Output Anda **hanya boleh berupa JSON object** di atas. Tidak boleh ada penjelasan, markdown, atau teks di luar JSON.\n- Selalu prioritaskan keakuratan dan kehati-hatian. Lebih baik `qdrant_relevancy: false` daripada memberikan informasi yang kurang meyakinkan.",
+          "enableStreaming": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -41072,
+        -4464
+      ],
+      "id": "b5bd9db2-a9ab-439c-ae5c-96e350bb6393",
+      "name": "ValidatorAgent"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify({  chat_input: $('Edit Fields').first().json.chatInput || $('Edit Fields').first().json.body?.chatInput || '',  product_query: $json.product_query || $('Parse AI Agent JSON').first().json.output?.product_query, nama_pelaku_usaha: $('Parse AI Agent JSON').first().json.output?.nama_pelaku_usaha, raw_query: $json.raw_query || $('Parse AI Agent JSON').first().json.output?.raw_query,  validated_final_answer: $json.final_answer,  draft_answer: $json.draft_answer,  validator_raw_output: typeof $json.output === 'string' ? $json.output : undefined,  api_response_body: $json.responseBody,  source_hint: $json.responseBody ? 'bpjph_api_fallback' : 'qdrant_chain'}, null, 2) }}\n\n{{ JSON.stringify({ response: $json.output.response }, null, 2) }}",
+        "options": {
+          "systemMessage": "=Anda adalah SummaryAgent AI Halal Checker. Anda adalah agen akhir yang bertugas menyatukan semua informasi menjadi satu jawaban utuh, jelas, sopan, dan meyakinkan dalam bahasa Indonesia.\n\n### POSISI ANDA:\nAnda berjalan SETELAH node \"AI Agent\" (Orchestrator).\n\n### SUMBER DATA UTAMA (RAW dari AI Agent):\n{{ JSON.stringify($('AI Agent').item.json, null, 2) }}\n\nOutput dari Validator (jika ada):\n{{ $if($('Parse AI Agent Validator JSON').isExecuted, $('Parse AI Agent Validator JSON').item.json.final_answer, '') }}\n\n### KEMAMPUAN KHUSUS:\nAnda HARUS bisa mengekstrak informasi meskipun output dari AI Agent berantakan (array, ```json, nested object, dll).\n\n### TUGAS UTAMA:\n1. Ekstrak data penting: chatInput, intent, user_facing_reply, nama_produk, nama_pelaku_usaha, no_sertifikat, dll.\n2. Satukan menjadi satu jawaban final yang koheren.\n\n### ATURAN LINK (WAJIB):\n- Jika menampilkan hasil produk halal (intent halal_check dan ada nama_produk), **wajib** menyertakan link pencarian resmi BPJPH dengan format berikut:\n  `https://bpjph.halal.go.id/cari/sertifikat?produk={nama_produk}&produsen={nama_pelaku_usaha}&no_regis={no_sertifikat}&page=1`\n\n- Ganti `{nama_produk}`, `{nama_pelaku_usaha}`, dan `{no_sertifikat}` dengan nilai yang ada (kosongkan parameter jika nilainya kosong).\n- Selalu tampilkan link ini di akhir informasi produk agar user bisa langsung verifikasi.\n\n### KRITIS WAJIB DIPATUHI:\n- Pahami chatInput meskipun penuh typo/leetspeak.\n- Prioritaskan gambar kemasan jika ada.\n- Jangan mengarang nama produk, nama pelaku usaha, atau nomor sertifikat.\n- Jangan menerjemahkan/paraphrase nama produk & brand.\n- Jika data kurang lengkap → tanyakan ke user.\n- Gunakan tool \"Perbedaan_MUI_dan_BPJPH\" hanya jika relevan.\n\n### GAYA JAWABAN:\n- Tegas, positif, meyakinkan.\n- Konfirmasikan data berasal dari sumber resmi BPJPH.\n- **WAJIB** akhiri dengan kalimat penutup:\n  \"Apakah informasi nama produk, nama pelaku usaha, dan nomor sertifikat di atas sudah sesuai dengan yang Anda maksud? Silakan konfirmasi agar kami dapat melanjutkan proses dengan tepat.\"\n\n### CONTOH OUTPUT SAAT HASIL HALAL CHECK:\n\n\"Produk Energen Chocolate Cereal Mix telah terdaftar di BPJPH dengan nomor sertifikat 1234567890123 yang masih berlaku.\n\nAnda dapat memverifikasi langsung melalui link resmi berikut:\nhttps://bpjph.halal.go.id/cari/sertifikat?produk=Energen%20Chocolate%20Cereal%20Mix&produsen=&no_regis=1234567890123&page=1\n\nApakah informasi nama produk, nama pelaku usaha, dan nomor sertifikat di atas sudah sesuai dengan yang Anda maksud? Silakan konfirmasi...\"\n\n**Output Anda**: Langsung teks jawaban untuk user (natural dan siap dikirim).",
+          "enableStreaming": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -41392,
+        -3728
+      ],
+      "id": "cb70c86d-b88c-440a-be72-587055a6b848",
+      "name": "SummaryAgent"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.output || 'Maaf sistem mengalami gangguan'}}",
+        "options": {
+          "enableStreaming": true
+        }
+      },
+      "id": "d07d8ce7-6f16-4e24-a572-3f9e1f8f8650",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -40832,
+        -3728
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "mode": "list",
+          "value": "daftar-sertifikasi-halal"
+        },
+        "options": {
+          "contentPayloadKey": "content",
+          "metadataPayloadKey": "metadata"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        -38352,
+        -3568
+      ],
+      "id": "b67b04a4-c6ce-4fd0-95c2-6f975fba8bc1",
+      "name": "Sertifikat_Halal (Insert)",
+      "credentials": {
+        "qdrantApi": {
+          "id": "PQfWxEBYx3f4ARi4",
+          "name": "QdrantApi account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.content }} ",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        -38288,
+        -3344
+      ],
+      "id": "08b41ca5-d953-467b-b020-911919dd8c26",
+      "name": "Default Data Loader (BPJPH v2)"
+    },
+    {
+      "parameters": {
+        "functionCode": "function stableHash(obj) {\n  const json = JSON.stringify(obj, Object.keys(obj).sort());\n  let h1 = 2166136261 >>> 0;\n  let h2 = 5381 >>> 0;\n  for (let i = 0; i < json.length; i++) {\n    const c = json.charCodeAt(i);\n    h1 ^= c;\n    h1 = Math.imul(h1, 16777619) >>> 0;\n    h2 = ((h2 << 5) + h2 + c) >>> 0;\n  }\n  return 'fnv_' + h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0') + '_' + json.length.toString(16);\n}\n\nconst datas = $json.output.data?.datas ?? $json.data?.data?.datas ?? [];\n\nreturn datas.map((row) => {\n  const productName = (row.product_name || '').trim();\n  const payload = {\n    source: 'bpjph_luar_negeri_v2',\n    id: row.id,\n    product_name: row.product_name,\n    product_description: row.product_description,\n    manufacture: row.manufacture,\n    company: row.company,\n    certificate: row.certificate,\n    submission: row.submission,\n    lhln: row.lhln,\n    hs_code: row.hs_code,\n    hs_code_description: row.hs_code_description,\n    link: row.link,\n  };\n\n  const parts = [];\n  if (productName) parts.push(`Product name: ${productName}`);\n  if (row.company?.company_name) parts.push(`Company: ${row.company.company_name}`);\n  if (row.company?.importer_name) parts.push(`Importer: ${row.company.importer_name}`);\n  if (row.certificate?.certificate_number) {\n    parts.push(`Cert: ${row.certificate.certificate_number}`);\n  }\n  if (row.certificate?.issued_date) {\n    parts.push(`Issued: ${row.certificate.issued_date}`);\n  }\n  if (row.certificate?.exp_date) {\n    parts.push(`Exp: ${row.certificate.exp_date}`);\n  }\n  const mfg = row.manufacture != null ? String(row.manufacture).trim() : '';\n  if (mfg) parts.push(`Manufacture: ${mfg}`);\n\n  const desc = (row.product_description || '').trim();\n  if (desc) parts.push(`Description: ${desc}`);\n\n  const scope = row.submission?.scope != null ? String(row.submission.scope).trim() : '';\n  if (scope) parts.push(`Scope: ${scope}`);\n\n  const subNo =\n    row.submission?.submission_number != null\n      ? String(row.submission.submission_number).trim()\n      : '';\n  if (subNo) parts.push(`Submission: ${subNo}`);\n\n  const lhlnName = row.lhln?.name != null ? String(row.lhln.name).trim() : '';\n  if (lhlnName) parts.push(`LHLN: ${lhlnName}`);\n\n  const expMra =\n    row.lhln?.exp_mra_date != null ? String(row.lhln.exp_mra_date).trim() : '';\n  if (expMra) parts.push(`MRA exp: ${expMra}`);\n\n  const hsParts = [row.hs_code, row.hs_code_description]\n    .filter((x) => x != null && String(x).trim())\n    .map((x) => String(x).trim());\n  if (hsParts.length) parts.push(`HS: ${hsParts.join(' — ')}`);\n\n  const link = row.link != null ? String(row.link).trim() : '';\n  if (link) parts.push(`Link: ${link}`);\n\n  const content = parts.join(' | ');\n\n  return {\n    json: {\n      content,\n      metadata: {\n        ...payload,\n        dedup_hash: stableHash(payload),\n      },\n      displayLine: `${productName} — ${row.company?.company_name || '-'} — ${row.certificate?.certificate_number || '-'}`,\n    },\n  };\n});"
+      },
+      "id": "74b72dde-5309-402f-9b7f-2a92a2d3df36",
+      "name": "Normalize BPJPH Luar Negeri",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -38576,
+        -3616
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        -41696,
+        -4768
+      ],
+      "id": "baf1fc18-9854-44bf-9638-c8e47dc0a91e",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "content": "### Readme\nLoad your data into a vector database with the 📚 **Load Data** flow, and then use your data as chat context with the 🐕 **Retriever** flow.\n\n**Quick start**\n1. Click on the `Execute Workflow` button to run the 📚 **Load Data** flow.\n2. Click on `Open Chat` button to run the 🐕 **Retriever** flow. Then ask a question about content from your document(s)\n\n\nFor more info, check [our docs on RAG in n8n](https://docs.n8n.io/advanced-ai/rag-in-n8n/).",
+        "height": 300,
+        "width": 440,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -42720,
+        -5120
+      ],
+      "typeVersion": 1,
+      "id": "99208faf-fe80-448c-b029-9a743e37b87d",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "### 📚 Load Data Flow",
+        "height": 460,
+        "width": 700,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -42240,
+        -5024
+      ],
+      "typeVersion": 1,
+      "id": "b99ef235-feb3-46f5-9afe-f483f09acdd7",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "### Embeddings\n\nThe Insert and Retrieve operation use the same embedding node.\n\nThis is to ensure that they are using the **exact same embeddings and settings**.\n\nDifferent embeddings might not work at all, or have unintended consequences.\n",
+        "height": 240,
+        "width": 320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -42656,
+        -4800
+      ],
+      "typeVersion": 1,
+      "id": "d278a130-79d2-4e77-8505-500979c91274",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "=perbedaan-bpjph-mui",
+          "mode": "id"
+        },
+        "embeddingBatchSize": 768,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        -41968,
+        -4976
+      ],
+      "id": "030e957a-aef7-44cf-b91b-94c44999f93b",
+      "name": "Qdrant Vector Store (Add)",
+      "credentials": {
+        "qdrantApi": {
+          "id": "PQfWxEBYx3f4ARi4",
+          "name": "QdrantApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "formTitle": "Upload your data to test RAG",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Upload your file(s)",
+              "fieldType": "file",
+              "acceptFileTypes": ".pdf, .csv, .json",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -42208,
+        -4976
+      ],
+      "id": "12e9e027-a083-4f57-8af1-6a7585420656",
+      "name": "On form submission",
+      "webhookId": "f3021019-1cef-4b86-a8a9-f0a276f375e4"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify({\n  source: 'orchestrator_dan_chat_user',\n  chat_input: $('Edit Fields').first().json.chatInput ?? $('Edit Fields').first().json.body?.chatInput ?? '',\n  orchestrator_intent: $('Parse AI Agent JSON').first().json.output?.intent,\n  product_query: $('Parse AI Agent JSON').first().json.output?.product_query || '',\n  raw_query: $('Parse AI Agent JSON').first().json.output?.raw_query || '',\n  orchestrator_output_excerpt: String($('Parse AI Agent JSON').first().json.output?.output ?? '').slice(0, 800),\n\n  page: $json.page || $('Parse AI Agent JSON').first().json.output?.page || 1,\n  size: $json.size || $('Parse AI Agent JSON').first().json.output?.size || 10,\n\n  parse_nama_produk: $('Parse AI Agent JSON').first().json.output?.nama_produk || '',\n  parse_nama_pelaku_usaha: $('Parse AI Agent JSON').first().json.output?.nama_pelaku_usaha || '',\n  parse_no_sertifikat: $('Parse AI Agent JSON').first().json.output?.no_sertifikat || '',\n\n  set_nama_produk: $json.nama_produk || '',\n  set_nama_pelaku_usaha: $json.nama_pelaku_usaha || '',\n  set_no_sertifikat: $json.no_sertifikat || ''\n}, null, 2) }}",
+        "options": {
+          "systemMessage": "=Anda adalah agen eksekusi API BPJPH v2 (lokal). Anda punya SATU tool HTTP saja.\n\nKRITIS:\n- Output akhir HARUS 1 JSON object valid (DILARANG MENGGUNAKAN FORMAT MARKDOWN -> ```json).\n- Root JSON tepat 1 key: \"data\". Contoh sukses: {\"data\":{\"current_page\":1,\"datas\":[...]}}. Contoh gagal/kosong: {\"data\":{\"datas\":[]}}. Jangan output string JSON ter-escape saja.\n\nUrutan WAJIB:\n1) Panggil tool tepat SATU kali.\n2) Setelah tool: salin body API ke \"data\" jika valid; jika error/kosong tetap {\"data\":{\"datas\":[]}}.\n\nKonteks user: `chat_input`, `product_query`, `raw_query`, `set_nama_produk`, `parse_nama_pelaku_usaha`, `parse_no_sertifikat`, `set_nama_pelaku_usaha`, `set_no_sertifikat`.\n\nArgumen tool: nama_produk pendek; page/size; no_sertifikat, nama_pelaku_usaha jika ada.\n\nJangan mengarang `data` sebelum tool dipanggil.\n\nKeterangan tambahan untuk eksekusi tools:\n- Untuk nama_produk kalau ada nama brand maka gunakan nama brand saja untuk mempermudah\n- Untuk nama_pelaku_usaha minimal characternya sebanyak 3, anda bisa memasukkan \"PT \" atau \"PT.\" Jika user mengatakan tidak tahu dari PT mana dan tidak ada data terkait nama pelaku usaha ini.",
+          "maxIterations": 20,
+          "enableStreaming": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -41040,
+        -4160
+      ],
+      "id": "bd33a9ee-c5bc-48d9-92e0-a1c5d70ca8d6",
+      "name": "BPJPH v2 Lokal Tool Agent",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Berisi dokumen lengkap tentang perbedaan antara BPJPH (Badan Penyelenggara Jaminan Produk Halal) dan LPPOM MUI (Lembaga Pengkajian Pangan, Obat-obatan, dan Kosmetika Majelis Ulama Indonesia) beserta dokumen resmi",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "perbedaan-bpjph-mui-1024",
+          "mode": "list",
+          "cachedResultName": "perbedaan-bpjph-mui-1024"
+        },
+        "topK": 10,
+        "includeDocumentMetadata": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        -41808,
+        -4176
+      ],
+      "id": "42b94d96-9837-4095-bb32-eab14927dd87",
+      "name": "Perbedaan_MUI_dan_BPJPH",
+      "credentials": {
+        "qdrantApi": {
+          "id": "PQfWxEBYx3f4ARi4",
+          "name": "QdrantApi account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Embeddings Ollama Retrieve": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Sertifikat_Halal (Get Many)",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "Sertifikat_Halal (Insert)",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "Perbedaan_MUI_dan_BPJPH",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "Qdrant Vector Store (Add)",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Agent JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Agent JSON": {
+      "main": [
+        [
+          {
+            "node": "IF - Intent halal_check?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "SummaryAgent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Intent halal_check?": {
+      "main": [
+        [
+          {
+            "node": "Sertifikat_Halal (Get Many)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SummaryAgent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pack Qdrant Results": {
+      "main": [
+        [
+          {
+            "node": "ValidatorAgent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Qdrant Ada Hasil?": {
+      "main": [
+        [
+          {
+            "node": "SummaryAgent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ekstrak Nama Produk (fallback v2)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "BPJPH v2 Luar Negeri Tool Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "ValidatorAgent",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "SummaryAgent",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "BPJPH v2 Lokal Tool Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ekstrak Nama Produk (fallback v2)": {
+      "main": [
+        [
+          {
+            "node": "BPJPH v2 Lokal Tool Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse BPJPH Lokal JSON": {
+      "main": [
+        [
+          {
+            "node": "IF - Lokal Ada Data?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Lokal Ada Data?": {
+      "main": [
+        [
+          {
+            "node": "Normalize BPJPH Lokal - Test",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "BPJPH v2 Luar Negeri Tool Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BPJPH v2 Luar Negeri Tool Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse BPJPH Luar Negeri JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse BPJPH Luar Negeri JSON": {
+      "main": [
+        [
+          {
+            "node": "IF - Lokal Ada Data?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Response (fallback v2)": {
+      "main": [
+        [
+          {
+            "node": "SummaryAgent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BPJPH v2 - Lokal (Tool)": {
+      "ai_tool": [
+        [
+          {
+            "node": "BPJPH v2 Lokal Tool Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BPJPH v2 - Luar Negeri (Tool)": {
+      "ai_tool": [
+        [
+          {
+            "node": "BPJPH v2 Luar Negeri Tool Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize BPJPH Lokal - Test": {
+      "main": [
+        [
+          {
+            "node": "Build Response (fallback v2)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Lokal Ada Data?1": {
+      "main": [
+        [
+          {
+            "node": "Build Response (fallback v2)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Response (fallback v2)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sertifikat_Halal (Get Many)": {
+      "main": [
+        [
+          {
+            "node": "Pack Qdrant Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Agent Validator JSON": {
+      "main": [
+        [
+          {
+            "node": "IF - Qdrant Ada Hasil?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ValidatorAgent": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Agent Validator JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SummaryAgent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader (BPJPH v2)": {
+      "ai_document": [
+        [
+          {
+            "node": "Sertifikat_Halal (Insert)",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize BPJPH Luar Negeri": {
+      "main": [
+        [
+          {
+            "node": "Sertifikat_Halal (Insert)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Response (fallback v2)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Qdrant Vector Store (Add)",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Qdrant Vector Store (Add)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BPJPH v2 Lokal Tool Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse BPJPH Lokal JSON",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SummaryAgent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perbedaan_MUI_dan_BPJPH": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "SummaryAgent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "a04bf1cd-bf04-4831-bd3a-240002c7a7b3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e764d18cd26d9a600496ef0c2b0583bb2eec5d3770483ea8bb92ed7644119d45"
+  },
+  "id": "ek175K6DUB2YeVmR",
+  "tags": [
+    {
+      "updatedAt": "2026-02-12T17:00:16.127Z",
+      "createdAt": "2026-02-12T17:00:16.127Z",
+      "id": "NXaN65mH4lzHwqpN",
+      "name": "halal-check-rag"
+    }
+  ]
+}
